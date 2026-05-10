@@ -136,13 +136,6 @@ jobs:
     runs-on: ubuntu-latest
     environment: release
 
-    env:
-      AZURE_CLIENT_ID:   ${{ secrets.AZURE_CLIENT_ID }}
-      AZURE_TENANT_ID:   ${{ secrets.AZURE_TENANT_ID }}
-      AAS_SIGN_ENDPOINT: ${{ secrets.TRUSTED_SIGNING_ENDPOINT }}
-      AAS_SIGN_ACCOUNT:  ${{ secrets.TRUSTED_SIGNING_ACCOUNT }}
-      AAS_SIGN_PROFILE:  ${{ secrets.CERTIFICATE_PROFILE }}
-
     steps:
       - uses: actions/checkout@v6
 
@@ -155,47 +148,37 @@ jobs:
           VERSION=${GITHUB_REF_NAME#v}
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Build signed image (x64)
+      - name: Build packed image (x64)
         uses: docker/build-push-action@v7
         with:
           context: .
-          target: signed
-          tags: w64devkit:x64-signed
+          target: pack
+          tags: w64devkit:x64-pack
           load: true
           cache-from: type=gha,scope=w64devkit-x64
           cache-to: type=gha,scope=w64devkit-x64,mode=max
 
-      - name: Sign and pack (x64)
+      - name: Pack (x64)
         run: |
-          docker run --rm \
-            -e AZURE_CLIENT_ID -e AZURE_TENANT_ID \
-            -e AAS_SIGN_ENDPOINT -e AAS_SIGN_ACCOUNT -e AAS_SIGN_PROFILE \
-            -e ACTIONS_ID_TOKEN_REQUEST_URL -e ACTIONS_ID_TOKEN_REQUEST_TOKEN \
-            w64devkit:x64-signed \
-            > w64devkit-x64-${{ steps.filename.outputs.version }}.7z.exe
+          docker run --rm w64devkit:x64-pack > w64devkit-x64-${{ steps.filename.outputs.version }}.7z.exe
           ls -lh w64devkit-x64-${{ steps.filename.outputs.version }}.7z.exe
 
       - name: Apply x86 patch
         run: patch -p1 -i src/variant-x86.patch
 
-      - name: Build signed image (x86)
+      - name: Build packed image (x86)
         uses: docker/build-push-action@v7
         with:
           context: .
-          target: signed
-          tags: w64devkit:x86-signed
+          target: pack
+          tags: w64devkit:x86-pack
           load: true
           cache-from: type=gha,scope=w64devkit-x86
           cache-to: type=gha,scope=w64devkit-x86,mode=max
 
-      - name: Sign and pack (x86)
+      - name: Pack (x86)
         run: |
-          docker run --rm \
-            -e AZURE_CLIENT_ID -e AZURE_TENANT_ID \
-            -e AAS_SIGN_ENDPOINT -e AAS_SIGN_ACCOUNT -e AAS_SIGN_PROFILE \
-            -e ACTIONS_ID_TOKEN_REQUEST_URL -e ACTIONS_ID_TOKEN_REQUEST_TOKEN \
-            w64devkit:x86-signed \
-            > w64devkit-x86-${{ steps.filename.outputs.version }}.7z.exe
+          docker run --rm w64devkit:x86-pack > w64devkit-x86-${{ steps.filename.outputs.version }}.7z.exe
           ls -lh w64devkit-x86-${{ steps.filename.outputs.version }}.7z.exe
 
       - name: Download source tarball
