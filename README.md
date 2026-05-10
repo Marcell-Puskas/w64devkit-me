@@ -1,4 +1,10 @@
-# Portable C, C++, and Fortran Development Kit for x64 and x86 Windows
+# Portable C, C++, and Fortran Development Kit for x64 and x86 Windows, Extended for Miskolc University students
+
+This repo is a fork of [w64devkit][]. The fork adds SDL3, OpenCL headers, and OpenCL ICD Loader.
+
+Big thaks to [skeeto](https://github.com/skeeto) for maintaining this project.
+
+## w64devkit
 
 [w64devkit][] is a Dockerfile that builds from source a small, portable
 development suite for creating C and C++ applications on and for x86 and
@@ -16,6 +22,8 @@ Included tools:
 * [Ccache][ccache] : compiler cache
 * [NSIS][nsis] : Windows installer compiler (`makensis`)
 * [aas-sign][aas-sign] : Authenticode signing via Azure Trusted Signing
+* [SDL3][sdl] :  Simple DirectMedia Layer
+* [OpenCL][opencl] : Open Computing Language
 
 It is an MSVCRT toolchain with pthreads, C++11 threads, and OpenMP. All
 included runtime components are static. **Docker is not required to use
@@ -248,8 +256,10 @@ binaries.
 [names]: https://learn.microsoft.com/en-us/cpp/build/reference/decorated-names
 [ninja]: https://ninja-build.org/
 [nsis]: https://nsis.sourceforge.io/
+[opencl]: https://www.khronos.org/opencl/
 [san2]: https://groups.google.com/forum/#!topic/address-sanitizer/q0e5EBVKZT4
 [san]: http://mingw-w64.org/doku.php/contribute#sanitizers_asan_tsan_usan
+[sdl]: https://libsdl.org/
 [vim]: https://www.vim.org/
 [w64]: http://mingw-w64.org/
 [w64devkit]: https://github.com/skeeto/w64devkit

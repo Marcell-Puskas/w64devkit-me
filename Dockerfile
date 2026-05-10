@@ -224,6 +224,36 @@ RUN curl --insecure --location --remote-name-all --remote-header-name \
  && mkdir nsis \
  && tar xjf nsis-$NSIS_VERSION-src.tar.bz2 -C nsis --strip-components=1
 
+FROM base AS dl-sdl3
+ARG SDL3_VERSION=3.4.8 \
+    SDL3_SHA256=e9fff7467fb60f037e6708da18b25560649e4c63edc2a69bb871b960d9cbfbba
+WORKDIR /dl
+RUN curl --insecure --location --remote-name-all --remote-header-name \
+    https://github.com/libsdl-org/SDL/releases/download/release-$SDL3_VERSION/SDL3-$SDL3_VERSION.tar.gz \
+ && printf '%s  %s\n' $SDL3_SHA256 SDL3-$SDL3_VERSION.tar.gz | sha256sum -c \
+ && mkdir sdl3 \
+ && tar xzf SDL3-$SDL3_VERSION.tar.gz -C sdl3 --strip-components=1
+
+FROM base AS dl-opencl
+ARG OPENCL_VERSION=2025.07.22 \
+    OPENCL_SHA256=98f0a3ea26b4aec051e533cb1750db2998ab8e82eda97269ed6efe66ec94a240
+WORKDIR /dl
+RUN curl --insecure --location --remote-name-all \
+    https://github.com/KhronosGroup/OpenCL-Headers/archive/refs/tags/v$OPENCL_VERSION.tar.gz \
+ && printf '%s  v%s.tar.gz\n' $OPENCL_SHA256 $OPENCL_VERSION | sha256sum -c \
+ && mkdir opencl \
+ && tar xzf v$OPENCL_VERSION.tar.gz -C opencl --strip-components=1
+
+FROM base AS dl-opencl-icd
+ARG ICD_VERSION=2025.07.22 \
+    ICD_SHA256=dff7a0b11ad5b63a669358e3476e3dc889a4a361674e5b69b267b944d0794142
+WORKDIR /dl
+RUN curl --insecure --location --remote-name-all \
+    https://github.com/KhronosGroup/OpenCL-ICD-Loader/archive/refs/tags/v$ICD_VERSION.tar.gz \
+ && printf '%s  v%s.tar.gz\n' $ICD_SHA256 $ICD_VERSION | sha256sum -c \
+ && mkdir opencl-icd \
+ && tar xzf v$ICD_VERSION.tar.gz -C opencl-icd --strip-components=1
+
 # Build cross-compiler
 
 FROM dl-cross AS cross
@@ -876,6 +906,47 @@ RUN sed -i 's/\r$//' Source/build.cpp \
         install-compiler install-stubs install-includes install-plugins \
         install-contrib install-utils
 
+FROM cross AS build-sdl3
+COPY --from=dl-sdl3 /dl/ /dl/
+WORKDIR /dl/sdl3
+RUN cmake -B build \
+        -DCMAKE_SYSTEM_NAME=Windows \
+        -DCMAKE_C_COMPILER=$ARCH-gcc \
+        -DCMAKE_CXX_COMPILER=$ARCH-g++ \
+        -DCMAKE_RC_COMPILER=$ARCH-windres \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=$PREFIX \
+        -DSDL_SHARED=ON \
+        -DSDL_STATIC=ON \
+ && cmake --build build -j$(nproc) \
+ && DESTDIR=/out cmake --install build
+
+FROM cross AS build-opencl
+COPY --from=dl-opencl /dl/ /dl/
+WORKDIR /dl/opencl
+RUN cmake -B build \
+        -DCMAKE_SYSTEM_NAME=Windows \
+        -DCMAKE_C_COMPILER=$ARCH-gcc \
+        -DCMAKE_CXX_COMPILER=$ARCH-g++ \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=$PREFIX \
+ && cmake --build build -j$(nproc) \
+ && DESTDIR=/out cmake --install build
+
+FROM cross AS build-opencl-icd
+COPY --from=dl-opencl-icd /dl/ /dl/
+COPY --from=build-opencl /out$PREFIX/include/ /deps/include/
+WORKDIR /dl/opencl-icd
+RUN cmake -B build \
+        -DCMAKE_SYSTEM_NAME=Windows \
+        -DCMAKE_C_COMPILER=$ARCH-gcc \
+        -DCMAKE_CXX_COMPILER=$ARCH-g++ \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=$PREFIX \
+        -DOPENCL_ICD_LOADER_HEADERS_DIR=/deps/include \
+ && cmake --build build -j$(nproc) \
+ && DESTDIR=/out cmake --install build
+
 # Collect source tarballs
 FROM base AS source
 COPY --from=dl-cross /dl/*.* /source/
@@ -892,6 +963,9 @@ COPY --from=dl-cmake /dl/*.* /source/
 COPY --from=dl-dcmake /dl/*.* /source/
 COPY --from=dl-7z /dl/*.* /source/
 COPY --from=dl-nsis /dl/*.* /source/
+COPY --from=dl-sdl3 /dl/*.* /source/
+COPY --from=dl-opencl /dl/*.* /source/
+COPY --from=dl-opencl-icd /dl/*.* /source/
 
 # Pack up a release
 
@@ -913,6 +987,9 @@ COPY --from=build-cmake /out$PREFIX/ $PREFIX/
 COPY --from=build-7z /dl/7z/7z.sfx /7z/
 COPY --from=build-nsis /out$PREFIX/ $PREFIX/
 COPY --from=build-aas-sign-w32 /out$PREFIX/ $PREFIX/
+COPY --from=build-sdl3 /out$PREFIX/ $PREFIX/
+COPY --from=build-opencl /out$PREFIX/ $PREFIX/
+COPY --from=build-opencl-icd /out$PREFIX/ $PREFIX/
 
 COPY src $PREFIX/src
 COPY etc $PREFIX/etc
